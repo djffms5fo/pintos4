@@ -75,6 +75,8 @@ struct buffer_head* bc_select_victim(void){
 		//lock_acquire(&bh->lock);
 		if(!bh->clock || !bh->is_used){
 			clock_hand++;
+			if(clock_hand == BUFFER_CACHE_ENTRY_NB)
+				clock_hand = 0;
 			return bh;
 		}
 		bh->clock = false;
@@ -86,6 +88,8 @@ struct buffer_head* bc_select_victim(void){
 		//lock_acquire(&bh->lock);
 		if(!bh->clock || !bh->is_used){
 			clock_hand++;
+			if(clock_hand == BUFFER_CACHE_ENTRY_NB)
+				clock_hand = 0;
 			return bh;
 		}
 		bh->clock = false;
