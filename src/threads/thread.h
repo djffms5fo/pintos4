@@ -113,6 +113,8 @@ struct thread
 
     struct file *runfile;
 
+    struct dir *dir;
+
 #endif
 
     /* Owned by thread.c. */

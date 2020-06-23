@@ -17,7 +17,7 @@
 
 // number of block that will be restored at inode directly 
 // declare size of inode_disk to be one block size(512Byte)
-#define DIRECT_BLOCK_ENTRIES 124
+#define DIRECT_BLOCK_ENTRIES 123
 
 // type of table
 enum direct_t{
@@ -47,7 +47,7 @@ struct inode_disk
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
     //uint32_t unused[125];               /* Not used. */
-    //uint32_t is_dir;
+    uint32_t is_dir;
     // array of disk block number that will be accessed directly
     block_sector_t direct_map_table[DIRECT_BLOCK_ENTRIES];
     // block number that will be accessed indirectly 
@@ -165,7 +165,7 @@ inode_init (void)
    Returns true if successful.
    Returns false if memory or disk allocation fails. */
 bool
-inode_create (block_sector_t sector, off_t length)
+inode_create (block_sector_t sector, off_t length, uint32_t is_dir)
 {
   struct inode_disk *disk_inode = NULL;
   bool success = false;
@@ -186,6 +186,7 @@ inode_create (block_sector_t sector, off_t length)
         inode_update_file_length(disk_inode, 0, length);
       }
       disk_inode->magic = INODE_MAGIC;
+      disk_inode->is_dir = is_dir;
       
       /*if (free_map_allocate (sectors, &disk_inode->start)) 
         {
@@ -679,4 +680,15 @@ static void free_inode_sectors(struct inode_disk *inode_disk){
     free_map_release(inode_disk->direct_map_table[i], 1);
     i++;
   }
+}
+
+
+
+bool inode_is_dir(const struct inode *inode){
+  struct inode_disk *inode_disk = (struct inode_disk*)malloc(BLOCK_SECTOR_SIZE);
+  if(inode->removed)
+    return false;
+  if(!get_disk_inode(inode, inode_disk))
+    return false;
+  return inode_disk->is_dir;
 }

@@ -23,6 +23,11 @@ static int write(int fd, void *buffer, unsigned size);
 static void seek(int fd, unsigned position);
 static unsigned tell(int fd);
 static void close(int fd);
+static bool isdir(int fd);
+static bool chdir(const char *dir);
+static bool mkdir(const char *dir);
+static bool readdir(int fd, char *name);
+static int inumber(int fd);
 
 void
 syscall_init (void) 
@@ -89,6 +94,26 @@ syscall_handler (struct intr_frame *f UNUSED)
 		case SYS_CLOSE:
 			get_argument((void*)sp, arg, 1);
 			close((int)arg[0]);
+			break;
+		case SYS_ISDIR:
+			get_argument((void*)sp, arg, 1);
+			f->eax = isdir((int)arg[0]);
+			break;
+		case SYS_CHDIR:
+			get_argument((void*)sp, arg, 1);
+			f->eax = chdir((const char*)arg[0]);
+			break;
+		case SYS_MKDIR:
+			get_argument((void*)sp, arg, 1);
+			f->eax = mkdir((const char*)arg[0]);
+			break;
+		case SYS_READDIR:
+			get_argument((void*)sp, arg, 2);
+			f->eax = readdir((int)arg[0], (char*)arg[1]);
+			break;
+		case SYS_INUMBER:
+			get_argument((void*)sp, arg, 1);
+			f->eax = inumber((int)arg[0]);
 			break;
 		default:
 			exit(-1);
@@ -216,4 +241,68 @@ unsigned tell(int fd){
 
 void close(int fd){
 	process_close_file(fd);
+}
+
+bool isdir(int fd){
+	struct file *f = process_get_file(fd);
+	if(!f)
+		exit(-1);
+	return inode_is_dir(file_get_inode(f));
+}
+
+bool chdir(const char *dir){
+	char cp_name[PATH_MAX + 1];
+  	char tmp_dir[PATH_MAX + 1];
+  	strlcpy(cp_name, dir, PATH_MAX);
+  	strlcpy(tmp_dir, dir, PATH_MAX);
+  	strlcat(tmp_dir, "/0", PATH_MAX);
+  	struct dir *tmp = parse_path(tmp_dir, cp_name);
+
+  	if(!tmp)
+  		return false;
+
+
+  	dir_close(thread_current()->dir);
+  	thread_current()->dir = tmp;
+  	return true;
+}
+
+bool mkdir(const char *dir){
+	return filesys_create_dir(dir);
+}
+
+bool readdir(int fd, char *name){
+	struct file *f = process_get_file(fd);
+	if(!f)
+		exit(-1);
+
+	struct inode *inode = file_get_inode(f);
+
+	if(!inode || !inode_is_dir(inode))
+		return false;
+
+	struct dir *dir = dir_open(inode);
+	if(!dir)
+		return false;
+
+	bool success = true;
+	int i;
+	while(i <= *((off_t*)f + 1)){
+		success = dir_readdir(dir, name);
+		i++;
+		if(!success)
+			break;
+	}
+
+	if(!(i <= *((off_t*)f + 1)))
+		(*((off_t*)f + 1))++;
+	return success;
+
+}
+
+int inumber(int fd){
+	struct file *f = process_get_file(fd);
+	if(!f)
+		exit(-1);
+	return inode_get_inumber(file_get_inode(f));
 }

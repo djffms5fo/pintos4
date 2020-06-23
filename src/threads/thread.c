@@ -100,6 +100,7 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  initial_thread->dir = NULL;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -185,6 +186,8 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
+  if(thread_current()->dir != NULL)
+    t->dir = dir_reopen(thread_current()->dir);
 
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
