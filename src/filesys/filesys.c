@@ -39,8 +39,8 @@ filesys_init (bool format)
 void
 filesys_done (void) 
 {
-  bc_term();
   free_map_close ();
+  bc_term();
 }
 
 /* Creates a file named NAME with the given INITIAL_SIZE.
@@ -76,12 +76,10 @@ filesys_open (const char *name)
   char cp_name[PATH_MAX + 1];
   strlcpy(cp_name, name, PATH_MAX);
   struct dir *dir = parse_path(name, cp_name);
-  if(!dir)
-    return NULL;
   struct inode *inode = NULL;
 
   if (dir != NULL)
-    dir_lookup (dir, name, &inode);
+    dir_lookup (dir, cp_name, &inode);
   dir_close (dir);
 
   return file_open (inode);
@@ -106,7 +104,7 @@ filesys_remove (const char *name)
   tmp_dir = dir_open(inode);
 
   if(!inode_is_dir(inode) || (tmp_dir && !dir_readdir(tmp_dir, tmp)))
-    success = dir != NULL && dir_remove(dir, cp_name);
+    success = (dir && dir_remove(dir, cp_name));
 
   dir_close (dir); 
 
@@ -133,11 +131,11 @@ do_format (void)
 }
 
 struct dir* parse_path(char *path_name,char *file_name){
+
+  if(!path_name || !file_name || strlen(path_name) == 0)
+    return NULL;
+
   struct dir *dir;
-  if(!path_name || !file_name)
-    return NULL;
-  if(strlen(path_name) == 0)
-    return NULL;
 
   char path[PATH_MAX + 1];
   strlcpy(path, path_name, PATH_MAX);
@@ -150,9 +148,9 @@ struct dir* parse_path(char *path_name,char *file_name){
   if(!inode_is_dir(dir_get_inode(dir)))
     return NULL;
 
-  char *token, *nextToken, *savePtr;
-  token = strtok_r(path, "/", &savePtr);
-  nextToken = strtok_r(NULL, "/", &savePtr);
+  char *savePtr;
+  char *token = strtok_r(path, "/", &savePtr);
+  char *nextToken = strtok_r(NULL, "/", &savePtr);
 
   if(!token){
     strlcpy(file_name, ".", PATH_MAX);

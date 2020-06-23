@@ -9,7 +9,6 @@ char *p_buffer_cache;               // points buffer cache memory
 struct buffer_head buffer_head[BUFFER_CACHE_ENTRY_NB];
                                        // array of buffer head
 int clock_hand;  // variable for clock algorithm when choosing victim
-struct lock lock;
 
 bool bc_read(block_sector_t sector_idx, void *buffer,
 			 off_t bytes_read, int chunk_size, int sector_ofs){
@@ -20,7 +19,6 @@ bool bc_read(block_sector_t sector_idx, void *buffer,
 		bh->is_used = true;
 		bh->dirty = false;
 		bh->sector = sector_idx;
-		//lock_release(&lock);
 		block_read(fs_device, sector_idx, bh->data);
 	}
 	memcpy(buffer + bytes_read, bh->data + sector_ofs, chunk_size);
@@ -38,7 +36,6 @@ bool bc_write(block_sector_t sector_idx, void *buffer,
 		bc_flush_entry(bh);
 		bh->is_used = true;
 		bh->sector = sector_idx;
-		//lock_release(&lock);
 		block_read(fs_device, sector_idx, bh->data);
 	}
 	memcpy(bh->data + sector_ofs, buffer + bytes_written,chunk_size);
@@ -60,7 +57,6 @@ void bc_init(void){
 		bc += BLOCK_SECTOR_SIZE;
 	}
 	clock_hand = 0;
-	lock_init(&lock);
 }
 
 void bc_term(void){
@@ -98,12 +94,10 @@ struct buffer_head* bc_select_victim(void){
 }
 
 struct buffer_head* bc_lookup(block_sector_t sector){
-	//lock_acquire(&lock);
 	struct buffer_head *bh;
 	for(bh = buffer_head; bh < buffer_head + BUFFER_CACHE_ENTRY_NB; bh++){
 		if(bh->is_used && bh->sector == sector){
 			//lock_acquire(&bh->lock);
-			//lock_release(&lock);
 			return bh;
 		}
 	}

@@ -43,10 +43,8 @@ struct inode_indirect_block{
    Must be exactly BLOCK_SECTOR_SIZE bytes long. */
 struct inode_disk
   {
-    //block_sector_t start;               /* First data sector. */
     off_t length;                       /* File size in bytes. */
     unsigned magic;                     /* Magic number. */
-    //uint32_t unused[125];               /* Not used. */
     uint32_t is_dir;
     // array of disk block number that will be accessed directly
     block_sector_t direct_map_table[DIRECT_BLOCK_ENTRIES];
@@ -54,7 +52,16 @@ struct inode_disk
     block_sector_t indirect_block_sec;
     // first index block when accessed by double indirect method
     block_sector_t double_indirect_block_sec;
-
+  };
+ /* In-memory inode. */
+struct inode 
+  {
+    struct list_elem elem;              /* Element in inode list. */
+    block_sector_t sector;              /* Sector number of disk location. */
+    int open_cnt;                       /* Number of openers. */
+    bool removed;                       /* True if deleted, false otherwise. */
+    int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
+    struct lock extend_lock;            // Semaphore lock
   };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -77,17 +84,7 @@ static void free_inode_sectors(struct inode_disk *inode_disk);
 static bool inode_update_file_length(struct inode_disk* inode_disk,
                                 off_t start_pos, off_t end_pos);
 
-/* In-memory inode. */
-struct inode 
-  {
-    struct list_elem elem;              /* Element in inode list. */
-    block_sector_t sector;              /* Sector number of disk location. */
-    int open_cnt;                       /* Number of openers. */
-    bool removed;                       /* True if deleted, false otherwise. */
-    int deny_write_cnt;                 /* 0: writes ok, >0: deny writes. */
-    struct lock extend_lock;            // Semaphore lock
-    //struct inode_disk data;             /* Inode content. */
-  };
+
 
 /* Returns the block device sector that contains byte offset POS
    within INODE.
@@ -599,44 +596,6 @@ static bool inode_update_file_length(struct inode_disk* inode_disk,
     bc_write(sector, zeros, 0, BLOCK_SECTOR_SIZE, 0);
   }
   return true;
-
-
-
-
-  /*char *zeros = (char*)malloc(BLOCK_SECTOR_SIZE);
-
-  if(start_pos == end_pos)
-    return true;
-  if(start_pos > end_pos)
-    return false;
-
-  int size = end_pos - start_pos;
-  int chunk_size;
-
-  while(size > 0){
-    struct sector_location sec_loc;
-    int sector_ofs = start_pos % BLOCK_SECTOR_SIZE;
-    block_sector_t sector_idx = byte_to_sector(inode_disk, start_pos - sector_ofs);
-    if(sector_ofs > 0){
-      chunk_size = BLOCK_SECTOR_SIZE - sector_ofs;
-    }
-    else{
-      if(free_map_allocate(1, &sector_idx)){
-        locate_byte(start_pos, &sec_loc);
-        register_sector(inode_disk, sector_idx, sec_loc);
-        chunk_size = BLOCK_SECTOR_SIZE;
-      }
-      else{
-        free(zeros);
-        return false;
-      }
-      bc_write(sector_idx, zeros, 0, BLOCK_SECTOR_SIZE, 0);
-    }
-    size -= chunk_size;
-    start_pos += chunk_size;
-  }
-  free(zeros);
-  return true;*/
 }
 
 static void free_inode_sectors(struct inode_disk *inode_disk){
@@ -685,10 +644,10 @@ static void free_inode_sectors(struct inode_disk *inode_disk){
 
 
 bool inode_is_dir(const struct inode *inode){
+  bool result = false;
   struct inode_disk *inode_disk = (struct inode_disk*)malloc(BLOCK_SECTOR_SIZE);
-  if(inode->removed)
-    return false;
-  if(!get_disk_inode(inode, inode_disk))
-    return false;
-  return inode_disk->is_dir;
+  if(inode->removed || !get_disk_inode(inode, inode_disk))
+    return result;
+  result = inode_disk->is_dir;
+  return result;
 }
